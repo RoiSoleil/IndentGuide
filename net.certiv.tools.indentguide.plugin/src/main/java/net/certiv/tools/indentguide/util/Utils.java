@@ -105,12 +105,14 @@ public class Utils {
 	public static Map<String, List<String>> prefixesFor(ISourceViewer viewer) throws Exception {
 		Map<String, List<String>> prefixes = new HashMap<>();
 		Map<String, String[]> map = getValue(viewer, PREFIXES);
-		map.forEach((k, v) -> {
-			List<String> vals = Arrays.stream(v) //
-					.filter(p -> p != null && !p.isBlank()) //
-					.toList();
-			prefixes.put(k, vals);
-		});
+		if(map != null) {
+			map.forEach((k, v) -> {
+				List<String> vals = Arrays.stream(v) //
+						.filter(p -> p != null && !p.isBlank()) //
+						.toList();
+				prefixes.put(k, vals);
+			});
+		}
 		return prefixes;
 	}
 
