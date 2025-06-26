@@ -154,7 +154,7 @@ public class Line implements Iterable<Pos> {
 		if (txt.isBlank()) return false;
 
 		List<String> prefixes = prefixMap.get(Utils.partitionType(viewer, num));
-		return prefixes.stream().anyMatch(p -> txt.startsWith(p));
+		return prefixes != null && prefixes.stream().anyMatch(txt::startsWith);
 	}
 
 	/**

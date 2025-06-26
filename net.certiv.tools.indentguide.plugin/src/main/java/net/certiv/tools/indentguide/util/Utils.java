@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.StringTokenizer;
+import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -33,8 +34,8 @@ import org.eclipse.jface.layout.PixelConverter;
 import org.eclipse.jface.preference.IPreferenceStore;
 import org.eclipse.jface.preference.PreferenceConverter;
 import org.eclipse.jface.resource.StringConverter;
-import org.eclipse.jface.text.BadLocationException;
 import org.eclipse.jface.text.IDocument;
+import org.eclipse.jface.text.IDocumentExtension3;
 import org.eclipse.jface.text.IRegion;
 import org.eclipse.jface.text.ITextViewer;
 import org.eclipse.jface.text.ITextViewerExtension5;
@@ -105,12 +106,14 @@ public class Utils {
 	public static Map<String, List<String>> prefixesFor(ISourceViewer viewer) throws Exception {
 		Map<String, List<String>> prefixes = new HashMap<>();
 		Map<String, String[]> map = getValue(viewer, PREFIXES);
-		map.forEach((k, v) -> {
-			List<String> vals = Arrays.stream(v) //
-					.filter(p -> p != null && !p.isBlank()) //
-					.toList();
-			prefixes.put(k, vals);
-		});
+		if(map != null) {
+			map.forEach((k, v) -> {
+				List<String> vals = Arrays.stream(v) //
+						.filter(p -> p != null && !p.isBlank()) //
+						.toList();
+				prefixes.put(k, vals);
+			});
+		}
 		return prefixes;
 	}
 
@@ -318,24 +321,34 @@ public class Utils {
 	}
 
 	/**
-	 * Return the partition type of the document held in the given viewer at the given
-	 * line.
+	 * Return the partition type of the document held in the given viewer at the given line.
 	 *
 	 * @param viewer text viewer
-	 * @param line   document line number
+	 * @param line document line number
 	 * @return partition type
 	 */
 	public static String partitionType(ITextViewer viewer, int line) {
-		try {
-			IDocument doc = viewer.getDocument();
-			if (doc != null && line > -1) {
-				return doc.getContentType(line);
+		IDocument doc = viewer.getDocument();
+		if (doc != null && line > -1) {
+			if (doc instanceof IDocumentExtension3 documentExtension3) {
+				return Arrays.stream(documentExtension3.getPartitionings()).map(partitioning -> safeContentTypeGetter(() -> documentExtension3.getContentType(partitioning, line, false)))
+										 .filter(Objects::nonNull)
+										 .findFirst()
+										 .orElseGet(() -> safeContentTypeGetter(() -> doc.getContentType(line)));
 			}
-		} catch (BadLocationException e) {
+			return safeContentTypeGetter(() -> doc.getContentType(line));
+		}
+		return DefContentType;
+	}
+
+	private static <V> V safeContentTypeGetter(Callable<V> callable) {
+		try {
+			return callable.call();
+		} catch (Exception e) {
 			// Activator.log("Prefix analysis failure on line %d [%s].", line,
 			// e.getMessage());
 		}
-		return DefContentType;
+		return null;
 	}
 
 	/**
