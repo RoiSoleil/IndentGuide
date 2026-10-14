@@ -1,0 +1,40 @@
+name: Windows checks
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Fetch the Eclipse jars
+        shell: bash
+        run: mvn -B -q -f .github/ci/pom.xml dependency:copy-dependencies -DoutputDirectory="$(cygpath -w "$PWD/lib")"
+      - name: Compile
+        shell: bash
+        run: |
+          CP=$(ls lib/*.jar | tr '\n' ';')
+          mkdir -p out/classes out/test out/check
+          # Java 8 bytecode, as build.sh makes it
+          javac -nowarn -encoding UTF-8 --release 8 -cp "$CP" -d out/classes $(find alien.rainbow.indentguide/src -name '*.java')
+          javac -encoding UTF-8 -cp "out/classes;$CP" -d out/test $(find alien.rainbow.indentguide/test -name '*.java')
+          javac -encoding UTF-8 -cp "$CP" -d out/check .github/ci/GlyphDrawingCheck.java
+      - name: Unit tests
+        shell: bash
+        run: java -cp "out/classes;out/test;$(ls lib/*.jar | tr '\n' ';')" org.junit.runner.JUnitCore jp.sourceforge.pdt_tools.indentguide.ParenthesisScannerTest
+      - name: Drawing of the parentheses, advanced and plain engines
+        shell: bash
+        run: |
+          cd out
+          java -cp "check;$(ls ../lib/*.jar | tr '\n' ';')" GlyphDrawingCheck
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: glyph-drawing
+          path: out/*.png
